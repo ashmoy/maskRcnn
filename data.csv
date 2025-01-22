@@ -1,0 +1,342 @@
+Patient,Canines,Side  ,Position
+CP01,CP01_L,Bilateral,Bicortical
+CP01,CP01_R,Bilateral,Bicortical
+CP03,CP03_L,Left,Bicortical
+CP04,CP04_R,Right,Palatal
+CP06,CP06_L,Bilateral,Bicortical
+CP06,CP06_R,Bilateral ,Bicortical
+CP07,CP07_L,Bilateral,Palatal
+CP07,CP07_R,Bilateral,Palatal
+CP08,CP08_R,Right,Bicortical
+CP09,CP09_R,Right,Palatal
+CP10,CP10_L,Left,Palatal
+CP11,CP11_L,Left,Buccal
+CP13,CP13_L,Bilateral,Bicortical
+CP13,CP13_R,Bilateral,Palatal
+CP14,CP14_L,Left,Palatal
+CP15,CP15_L,Bilateral,Bicortical
+CP15,CP15_R,Bilateral,Bicortical
+CP16,CP16_L,Bilateral,Palatal
+CP16,CP16_R,Bilateral,Palatal
+CP17,CP17_L,Left,Buccal
+CP18,CP18_L,Bilateral,Palatal
+CP18,CP18_R,Bilateral,Palatal
+CP19,CP19_R,Bilateral,Palatal
+CP19,CP19_L,Bilateral,Palatal
+CP20,CP20_L,Bilateral,Bicortical
+CP20,CP20_R,Bilateral,Bicortical
+CP21,CP21_R,Bilateral,Buccal
+CP21,CP21_L,Bilateral,Buccal
+CP22,CP22_R,Right,Buccal
+CP23,CP23_R,Right,Buccal
+CP24,CP24_R,Right,Buccal
+CP25,CP25_L,Left,Palatal
+CP28,CP28_R,Right,Palatal
+CP30,CP30_L,Bilateral,Bicortical
+CP30,CP30_R,Bilateral,Bicortical
+CP31,CP31_L,Bilateral,Buccal
+CP31,CP31_R,Bilateral,Buccal
+CP33,CP33_L,Left,Palatal
+CP34,CP34_L,Bilateral,Bicortical
+CP34,CP34_R,Bilateral,Palatal
+CP35,CP35_R,Right,Palatal
+CP36,CP36_L,Bilateral,Bicortical
+CP37,CP37_L,Bilateral,Bicortical
+CP38,CP38_L,Left,Palatal
+CP38,CP38_R,Bilateral,Palatal
+CP39,CP39_R,Right,Buccal
+CP43,CP43_R,Right,Bicortical
+CP44,CP44_R,Right,Buccal
+CP45,CP45_L,Left,Buccal
+CP47,CP47_L,Bilateral,Palatal
+CP47,CP47_R,Bilateral,Bicortical
+CP51,CP51_L,Bilateral,Palatal
+CP51,CP51_R,Bilateral,Palatal
+CP52,CP52_R,Right,Bicortical
+CP53,CP53_L,Left,Buccal
+CP54,CP54_L,Left,Bicortical
+CP55,CP55_L,Bilateral,Bicortical
+CP55,CP55_R,Bilateral,Bicortical
+CP56,CP56_L,Left,Buccal
+CP57,CP57_L,Left,Bicortical
+CP59,CP59_L,Bilateral,Bicortical
+CP59,CP59_R,Bilateral,Palatal
+CP60,CP60_L,Bilateral,Palatal
+CP60,CP60_R,Bilateral,Palatal
+CP61,CP61_L,Bilateral,Palatal
+CP61,CP61_R,Bilateral,Bicortical
+CP62,CP62_L,Bilateral,Palatal
+CP62,CP62_R,Bilateral,Palatal
+CP63,CP63_L,Left,Palatal
+CP64,CP64_L,Left,Palatal
+CP65,CP65_L,Bilateral,Palatal
+CP65,CP65_R,Bilateral,Palatal
+CP66,CP66_L,Bilateral,Palatal
+CP66,CP66_R,Bilateral,Palatal
+CP68,CP68_L,Left,Buccal
+CP69,CP69_L,Bilateral,Buccal
+CP69,CP69_R,Bilateral,Buccal
+CP70,CP70_R,Right,Bicortical
+CP71,CP71_R,Right,Buccal
+CP72,CP72_L,Bilateral,Palatal
+CP72,CP72_R,Bilateral,Palatal
+CP73,CP73_L,Bilateral,Buccal
+CP73,CP73_R,Bilateral,Buccal
+CP74,CP74_R,Right,Palatal
+UM01,UM01_L,Bilateral,Palatal
+UM01,UM01_R,Bilateral,Palatal
+UM02,UM02_L,Left,Bicortical
+UM03,UM03_R,Right,Palatal
+UM05,UM05_R,Right,Palatal
+UM06,UM06_R,Right,Palatal
+UM07,UM07_L,Bilateral,Palatal
+UM07,UM07_R,Bilateral,Palatal
+UM10,UM10_L,Bilateral,Palatal
+UM10,UM10_R,Bilateral,Palatal
+UM11,UM11_L,Left,Buccal
+UM12,UM12_R,Right,Buccal
+UM15,UM15_L,Bilateral,Palatal
+UM15,UM15_R,Bilateral,Palatal
+UM16,UM16_L,Left,Palatal
+UM17,UM17_L,Left,Buccal
+UM18,UM18_R,Right,Palatal
+UM19,UM19_R,Right,Bicortical
+UM23,UM23_R,Bilateral,Palatal
+UM23,UM23_L,Bilateral,Palatal
+UM24,UM24_R,Bilateral,Palatal
+UM24,UM24_L,Bilateral,Buccal
+UM26,UM26_R,Right,Palatal
+UM27,UM27_L,Bilateral,Bicortical
+UM27,UM27_R,Bilateral,Buccal
+UM29,UM29_L,Left,Bicortical
+UP01,UP01_R,Right,Buccal
+UP02,UP02_L,Bilateral,Buccal
+UP02,UP02_R,Bilateral,Buccal
+UP03,UP03_L,Left,Palatal
+UP04,UP04_R,Right,Buccal
+UP05,UP05_R,Right,Buccal
+UP06,UP06_L,Bilateral,Buccal
+UP06,UP06_R,Bilateral,Palatal
+UP07,UP07_L,Bilateral,Bicortical
+UP07,UP07_R,Bilateral,Buccal
+UP08,UP08_L,Bilateral,Buccal
+UP08,UP08_R,Bilateral,Buccal
+UP09,UP09_L,Bilateral,Buccal
+UP09,UP09_R,Bilateral,Palatal
+UP10,UP10_L,Left,Palatal
+UP11,UP11_R,Right,Bicortical
+UP12,UP12_L,Left ,Bicortical
+UP13,UP13_L,Left ,Buccal
+UP14,UP14_L,Bilateral,Bicortical
+UP14,UP14_R,Bilateral,Bicortical
+UP15,UP15_L,Bilateral,Bicortical
+UP15,UP15_R,Bilateral,Bicortical
+UP16,UP16_L,Left,Buccal
+UP17,UP17_L,Bilateral,Palatal
+UP17,UP17_R,Bilateral,Buccal
+,,,
+MN001,MN001_L,Bilateral,Bicortical
+MN001,MN001_R,Bilateral,Bicortical
+MN002,MN002_L,Bilateral,Bicortical
+MN002,MN002_R,Bilateral,Buccal
+MN003,MN003_R,Right,BuccaL
+MN004,MN004_L,Bilateral,Palatal
+MN004,MN004_R,Bilateral,Palatal
+MN005,MN005_R,Right,Palatal
+MN006,EXCLUDED,,
+MN007,MN007_R,Right ,Palatal
+MN008,MN008_L,Left,Buccal
+MN009,MN009_L,Left,Palatal
+MN010,MN010_R,Right ,Palatal
+MN011,MN011_R,Right ,Buccal
+MN012,MN012_L,Bilateral ,Buccal
+MN012,MN012_R,Bilateral ,Buccal
+MN013,MN013_L,Bilateral ,Palatal
+MN013,MN013_R,Bilateral ,Palatal
+MN014,MN014_L,Bilateral ,Bicortical
+MN014,MN014_R,Bilateral ,Bicortical
+MN015,MN015_R,Right ,Bicortical
+MN016,MN016_R,Right ,Palatal
+MN017,MN017_R,Right ,Palatal 
+MN018,MN018_L,Left,Palatal
+MN019,MN019_L,Left,Palatal
+MN020,MN020_L,Left,Palatal
+MN021,MN021_L,Bilateral ,Bicortical
+MN021,MN021_R,Bilateral ,Buccal
+MN022,MN022_L,Left,Buccal
+MN023,MN023_L,Left,Palatal
+MN024,MN024_L,Bilateral ,Bicortical
+MN024,MN024_R,Bilateral ,Palatal
+MN025,MN025_L,Left,Palatal
+MN026,MN026_L,Left,Bicortical
+MN027,MN027_L,Bilateral ,Palatal
+MN027,MN027_R,Bilateral ,Palatal
+MN028,MN028_R,Right ,Bicortical
+MN029,MN029_L,Left,Bicortical
+MN030,MN030_L,Left,Bicortical
+MN031,MN031_L,Left,Palatal
+MN032,MN032_L,Bilateral ,Bicortical
+MN032,MN032_R,Bilateral ,Buccal
+MN033,MN033_L,Bilateral ,Bicortical
+MN033,MN033_R,Bilateral ,Buccal
+MN034,MN034_L,Bilateral ,Palatal
+MN034,MN034_R,Bilateral ,Palatal
+MN035,MN035_L,Bilateral ,Buccal
+MN035,MN035_R,Bilateral ,Buccal
+MN036,MN036_L,Left,Palatal
+MN037,MN037_L,Left,Bicortical
+MN038,MN038_L,Bilateral ,Palatal
+MN038,MN038_R,Bilateral ,Palatal
+MN039,MN039_R,Right ,Palatal
+MN040,MN040_L,Bilateral ,Bicortical
+MN040,MN040_R,Bilateral ,Bicortical
+MN041,MN041_R,Right ,Palatal
+MN042,MN042_L,Left,Palatal
+MN043,MN043_L,Left,Bicortical
+MN044,MN044_R,Right ,Palatal
+MN045,MN045_L,Left,Bicortical 
+MN046,MN046_L,Bilateral ,Palatal
+MN046,MN046_R,Bilateral ,Bicortical
+MN047,MN047_L,Left,Palatal
+MN048,MN048_L,Bilateral ,Bicortical
+MN048,MN048_R,Bilateral ,Palatal
+MN049,MN049_L,Bilateral ,Palatal
+MN049,MN049_R,Bilateral ,Bicortical
+MN050,MN050_L,Bilateral ,Bicortical
+MN050,MN050_R,Bilateral ,Buccal
+MN051,MN051_L,Bilateral ,Palatal
+MN051,MN051_R,Bilateral ,Palatal
+MN052,MN052_L,Left,Palatal
+MN053,MN053_L,Left,Palatal
+MN054,MN054_L,Bilateral ,Palatal
+MN054,MN054_R,Bilateral ,Palatal
+MN055,MN055_R,Right ,Bicortical
+MN056,MN056_L,Left,Buccal
+MN057,MN057_L,Bilateral ,Palatal
+MN057,MN057_R,Bilateral ,Buccal
+MN058,MN058_L,Left,Palatal
+MN059,MN059_L,Bilateral ,Buccal
+MN059,MN059_R,Bilateral ,Buccal
+MN060,MN060_L,Left,Buccal 
+MN061,MN061_L,Left,Palatal
+MN062,MN062_R,Right ,Palatal
+MN063,MN063_R,Right ,Buccal
+MN064,MN064_R,Right ,Bicortical 
+MN065,MN065_L,Bilateral ,Palatal
+MN065,MN065_R,Bilateral ,Palatal
+MN066,MN066_L,Left,Palatal
+MN067,MN067_L,Bilateral ,Palatal
+MN067,MN067_R,Bilateral ,Palatal
+MN068,MN068_L,Left,Palatal 
+MN069,MN069_L,Bilateral ,Palatal 
+MN069,MN069_R,Bilateral ,Palatal
+MN070,MN070_L,Bilateral ,Palatal
+MN070,MN070_R,Bilateral ,Palatal
+MN071,MN071_L,Left,Bicortical
+MN072,MN072_L,Bilateral ,Bicortical 
+MN072,MN072_R,Bilateral ,Palatal
+MN073,MN073_R,Right ,Palatal
+MN074,MN074_R,Right ,Buccal 
+MN075,MN075_L,Bilateral ,Buccal 
+MN075,MN075_R,Bilateral ,Buccal 
+MN076,MN076_L,Left,Bicortical 
+MN077,MN077_L,Bilateral ,Buccal
+MN077,MN077_R,Bilateral ,Buccal
+MN078,MN078_L,Bilateral ,Palatal
+MN078,MN078_R,Bilateral ,Bicortical 
+MN079,MN079_L,Left,Palatal
+MN080,MN080_L,Bilateral ,Palatal
+MN080,MN080_R,Bilateral ,Palatal
+MN081,MN081_L,Bilateral ,Buccal
+MN081,MN081_R,Bilateral ,Buccal
+MN082,MN082_L,Bilateral ,Palatal
+MN082,MN082_R,Bilateral ,Palatal
+MN083,MN083_L,Bilateral ,Buccal 
+MN083,MN083_R,Bilateral ,Buccal
+MN084,MN084_R,Right ,Buccal
+MN085,MN085_L,Left,Buccal
+MN086,MN086_L,Left,Bicortical
+MN087,MN087_R,Right ,Palatal
+MN088,MN088_R,Right ,Bicortical 
+MN089,MN089_L,Left,Bicortical
+MN090,MN090_L,Bilateral ,Palatal
+MN090,MN090_R,Bilateral ,Palatal
+MN091,MN091_L,Left,Bicortical
+MN092,MN092_L,Bilateral ,Bicortical
+MN092,MN092_R,Bilateral ,Bicortical
+MN093,MN093_L,Left,Palatal
+MN094,MN094_R,Right ,Bucccal
+MN095,MN095_R,Right ,Palatal
+MN096,MN096_L,Bilateral ,Buccal
+MN096,MN096_R,Bilateral ,Bicortical
+MN097,MN097_R,Right ,Palatal
+MN098,MN098_L,Bilateral ,Bicortical
+MN098,MN098_R,Bilateral ,Bicortical
+MN099,MN099_R,Right ,Bicortical
+MN100,MN100_R,Right ,Buccal
+MN101,MN101_R,Right ,Palatal
+MN102,MN102_L,Bilateral ,Palatal
+MN102,MN102_R,Bilateral ,Bicortical
+MN103,MN103_L,Bilateral ,Bicortical
+MN103,MN103_R,Bilateral ,Bicortical
+MN104,MN104_R,Right ,Palatal 
+MN105,MN105_L,Left,Palatal
+MN106,MN106_R,Right ,Palatal 
+MN107,MN107_L,Left,Bicortical
+MN108,MN108_L,Bilateral ,Palatal
+MN108,MN108_R,Bilateral ,Bicortical
+MN109,MN109_R,Right ,Palatal
+MN110,MN110_L,Bilateral ,Palatal
+MN110,MN110_R,Bilateral ,Palatal
+MN111,MN111_L,Left,Bicortical
+MN112,MN112_L,Bilateral ,Bicortical
+MN112,MN112_R,Bilateral ,Bicortical
+MN113,MN113_L,Bilateral ,Palatal
+MN113,MN113_R,Bilateral ,Palatal
+MN114,MN114_L,Bilateral ,Palatal
+MN114,MN114_R,Bilateral ,Palatal
+MN115,MN115_R,Right ,Bicortical
+MN116,MN116_L,Left,Palatal
+MN117,MN117_L,Left,Bicortical
+MN118,MN118_R,Right ,Buccal
+MN119,MN119_L,Left,Bicortical
+MN120,MN120_L,Left,Buccal
+MN121,MN121_L,Left,Palatal
+MN122,MN122_L,Bilateral ,Bicortical
+MN122,MN122_R,Bilateral ,Bicortical
+MN123,MN123_L,Bilateral ,Bicortical 
+MN123,MN123_R,Bilateral ,Palatal
+MN124,MN124_R,Right ,Bicortical
+MN125,MN125_L,Left,Palatal
+MN126,MN126_R,Right ,Bicortical
+MN127,MN127_L,Bilateral ,Palatal
+MN127,MN127_R,Bilateral ,Bicortical
+MN128,MN128_L,Bilateral ,Buccal
+MN128,MN128_R,Bilateral ,Buccal
+MN129,MN129_L,Left,Bicortical
+MN130,MN130_R,Right ,Palatal
+MN131,MN131_L,Left,Palatal
+MN132,MN132_L,Left,Bicortical
+MN133,MN133_L,Left,Palatal
+MN134,MN134_L,Left,Bicortical
+MN135,MN135_R,Right ,Palatal
+MN136,MN136_L,Bilateral ,Bicortical
+MN136,MN136_R,Bilateral ,Bicortical
+MN137,MN137_L,Bilateral ,Palatal
+MN137,MN137_R,Bilateral ,Bicortical
+MN138,MN138_L,Bilateral ,Buccal
+MN138,MN138_R,Bilateral ,Bicortical
+MN139,MN139_L,Bilateral ,Palatal
+MN139,MN139_R,Bilateral ,Palatal
+MN140,MN140_L,Bilateral ,Palatal
+MN140,MN140_R,Bilateral ,Palatal
+MN141,MN141_L,Left,Palatal
+MN142,MN142_L,Left,Palatal
+MN143,MN143_L,Bilateral ,Bicortical
+MN143,MN143_R,Bilateral ,Bicortical 
+MN144,MN144_L,Bilateral ,Palatal
+MN144,MN144_R,Bilateral ,Palatal
+MN145,MN145_L,Bilateral ,Buccal
+MN145,MN145_R,Bilateral ,Bicortical
+MN146,MN146_L,Bilateral ,Palatal
+MN146,MN146_R,Bilateral ,Palatal
