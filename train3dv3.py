@@ -17,6 +17,7 @@ from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 from torchvision import tv_tensors
 from torchvision.transforms.v2 import functional as F
+from PIL import Image
 
 
 # ============================
@@ -34,14 +35,14 @@ def extract_and_save_slices(
     masks_folder,
     temp_folder,
     csv_path,
-    min_box_size=35
+    min_box_size=105
 ):
     """
     1) Parcourt les (scan, masque) en .nii dans scans_folder et masks_folder
     2) Pour chaque tranche 2D :
        - Vérifie bounding box >= min_box_size
        - Vérifie qu'il y a au moins un label > 0
-       - Sauvegarde en .npy + écrit dans le CSV
+       - Sauvegarde en .png + écrit dans le CSV
     """
     os.makedirs(temp_folder, exist_ok=True)
 
@@ -51,7 +52,7 @@ def extract_and_save_slices(
 
     with open(csv_path, mode='w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['slice_id', 'scan_npy', 'mask_npy'])
+        writer.writerow(['slice_id', 'scan_png', 'mask_png'])
         slice_id = 0
 
         for scan_file, mask_file in tqdm(
@@ -95,10 +96,8 @@ def extract_and_save_slices(
 
                 # Vérif qu'il y a AU MOINS un label > 0
                 unique_vals = torch.unique(mask_tensor)
-                # On enlève la valeur 0, il reste éventuellement [1, 2, 3, ...]
                 valid_vals = unique_vals[unique_vals > 0]
                 if len(valid_vals) == 0:
-                    # => masque n'a pas de classe d'objet > 0
                     continue
 
                 # Normalisation
@@ -108,11 +107,15 @@ def extract_and_save_slices(
                 else:
                     scan_slice = np.zeros_like(scan_slice)
 
-                # Sauvegarde .npy
-                scan_outfile = os.path.join(temp_folder, f"scan_{slice_id}.npy")
-                mask_outfile = os.path.join(temp_folder, f"mask_{slice_id}.npy")
-                np.save(scan_outfile, scan_slice)
-                np.save(mask_outfile, mask_slice)
+                # Conversion en 8 bits pour PNG
+                scan_slice_8bit = (scan_slice * 255).astype(np.uint8)
+                mask_slice_8bit = (mask_slice * 255 / mask_slice.max()).astype(np.uint8)
+
+                # Sauvegarde en PNG
+                scan_outfile = os.path.join(temp_folder, f"scan_{slice_id}.png")
+                mask_outfile = os.path.join(temp_folder, f"mask_{slice_id}.png")
+                Image.fromarray(scan_slice_8bit).save(scan_outfile)
+                Image.fromarray(mask_slice_8bit).save(mask_outfile)
 
                 # Écrit dans le CSV
                 writer.writerow([slice_id, scan_outfile, mask_outfile])
@@ -120,6 +123,7 @@ def extract_and_save_slices(
 
     print(f"Extraction terminée. Les tranches valides sont dans {temp_folder}")
     print(f"Métadonnées enregistrées dans : {csv_path}")
+
 
 
 ############################################################
@@ -139,8 +143,8 @@ class TempSlicesDataset(Dataset):
             reader = csv.DictReader(f)
             for row in reader:
                 slice_id = int(row['slice_id'])
-                scan_npy = row['scan_npy']
-                mask_npy = row['mask_npy']
+                scan_npy = row['scan_png']
+                mask_npy = row['mask_png']
                 self.entries.append((slice_id, scan_npy, mask_npy))
 
     def __len__(self):
@@ -149,9 +153,9 @@ class TempSlicesDataset(Dataset):
     def __getitem__(self, idx):
         slice_id, scan_path, mask_path = self.entries[idx]
 
-        # Charger .npy
-        scan_slice = np.load(scan_path)  # [H, W]
-        mask_slice = np.load(mask_path)  # [H, W]
+        scan_slice = np.asarray(Image.open(scan_path))  # [H, W]
+        mask_slice = np.asarray(Image.open(mask_path))  # [H, W]
+
 
         scan_tensor = torch.from_numpy(scan_slice).unsqueeze(0).float()  # [1, H, W]
         mask_tensor = torch.from_numpy(mask_slice).long()                # [H, W]
@@ -240,7 +244,11 @@ def get_model_instance_segmentation(num_classes):
     model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask, hidden_layer, num_classes)
     return model
 
-
+def convert_to_tensors(targets):
+    return [
+        {k: torch.tensor(v) if isinstance(v, (int, float, np.ndarray)) else v for k, v in t.items()}
+        for t in targets
+    ]
 def generate_confusion_matrix(data_loader_test, model, device, num_classes, output_folder):
     all_true_labels = []
     all_pred_labels = []
@@ -310,7 +318,7 @@ def train_model(
         masks_folder,
         temp_folder,
         slices_csv,
-        min_box_size=45  # Ajustez si besoin
+        min_box_size=55  # Ajustez si besoin
     )
 
     # 2) Dataset sans None
@@ -363,11 +371,11 @@ def train_model(
 
     optimizer = optim.SGD(
         model.parameters(),
+        momentum=  0.9,
+        weight_decay=0.0001,
         lr=lr,
-        momentum=0.9,
-        weight_decay=0.0005
     )
-    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
+    #lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
 
     # 5) Entraînement
     print("=== Étape 5 : Entraînement ===")
@@ -375,7 +383,7 @@ def train_model(
         print(f"Epoch {epoch+1}/{num_epochs}")
         train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=10)
         evaluate(model, val_loader, device=device)
-        lr_scheduler.step()
+        #lr_scheduler.step()
 
     os.makedirs(output_folder, exist_ok=True)
     model_path = os.path.join(output_folder, "final_model.pth")
@@ -416,7 +424,7 @@ if __name__ == "__main__":
                         help='Nombre total d\'époques.')
     parser.add_argument('--output_folder', type=str, required=True,
                         help='Dossier pour sauvegarder le modèle et résultats.')
-    parser.add_argument('--lr', type=float, default=0.005,
+    parser.add_argument('--lr', type=float, default=0.0005,
                         help='Learning rate.')
     parser.add_argument('--temp_folder', type=str, default='temp_slices',
                         help='Dossier pour stocker les slices .npy.')
