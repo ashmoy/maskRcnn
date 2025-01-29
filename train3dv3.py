@@ -29,6 +29,14 @@ os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 ############################################################
 # (A) EXTRACTION & SAUVEGARDE DES TRANCHES
 ############################################################
+
+import os
+import csv
+import nibabel as nib
+import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+
 def extract_and_save_slices(
     scans_folder,
     masks_folder,
@@ -48,7 +56,8 @@ def extract_and_save_slices(
     scan_files = sorted([f for f in os.listdir(scans_folder) if f.endswith('.nii')])
     mask_files = sorted([f for f in os.listdir(masks_folder) if f.endswith('.nii')])
 
-    
+
+
     assert len(scan_files) == len(mask_files), "Mismatch entre scans et masques!"
 
     with open(csv_path, mode='w', newline='') as f:
@@ -71,6 +80,15 @@ def extract_and_save_slices(
 
                 scan_proxy = scan_img.dataobj
                 mask_proxy = mask_img.dataobj
+                # Vérifier tous les labels uniques dans tout le fichier masque
+                mask_data = np.asanyarray(mask_proxy)
+               # unique_labels = np.unique(mask_data)
+                mask_data = np.round(mask_data).astype(np.int32)
+
+                #print(f"Fichier {mask_file} - Labels uniques trouvés : {unique_labels}")
+                #print(f"Type des labels dans {mask_file} : {mask_data.dtype}")
+                #unique_labels_corrected = np.unique(mask_data)
+                #print(f"Fichier {mask_file} - Labels après conversion : {unique_labels_corrected}")
 
                 nb_slices_scan = scan_img.shape[2]
                 nb_slices_mask = mask_img.shape[2]
@@ -81,10 +99,14 @@ def extract_and_save_slices(
 
             for i in range(min_slices):
                 scan_slice = np.asanyarray(scan_proxy[..., i])
-                mask_slice = np.asanyarray(mask_proxy[..., i])
+                mask_slice = np.asanyarray(mask_data[..., i])
 
-                # Vérif bounding box
-                mask_tensor = torch.from_numpy(mask_slice).to(torch.int64)  # Convertir en type compatible
+                #print(f"Fichier {mask_file} - Tranche {i} - Type: {mask_slice.dtype}, Min: {mask_slice.min()}, Max: {mask_slice.max()}")
+                
+                mask_tensor = torch.from_numpy(mask_slice).to(torch.int32)
+                #print(f"Tranche {i} - Labels uniques trouvés : {torch.unique(mask_tensor)}")
+                
+
                 y, x = torch.where(mask_tensor != 0)
                 if len(y) == 0:
                     continue
@@ -123,11 +145,12 @@ def extract_and_save_slices(
 
     print(f"Extraction terminée. Les tranches valides sont dans {temp_folder}")
     print(f"Métadonnées enregistrées dans : {csv_path}")
-
-
 ############################################################
 # (B) DATASET
 ############################################################
+    
+
+
 class TempSlicesDataset(Dataset):
     def __init__(self, csv_path, transforms=None):
         """
@@ -162,6 +185,7 @@ class TempSlicesDataset(Dataset):
         # Labels > 0 => objets
         labels = torch.unique(mask_tensor)
         labels = labels[labels != 0]  # On retire 0 (fond)
+        #print(labels)
         # À ce stade, on SAVAIT déjà que len(labels) >= 1, sinon la tranche
         # n'aurait pas été écrite dans le CSV.
             # Vérifier que les labels sont valides
@@ -184,6 +208,7 @@ class TempSlicesDataset(Dataset):
             if (x_max > x_min) and (y_max > y_min) and labels[i] <5:  # Vérification explicite des dimensions
                 valid_boxes.append(box)
                 valid_labels.append(labels[i])
+                #print(valid_labels[i])
                 valid_masks.append(masks[i])
 
         if len(valid_boxes) == 0:
@@ -244,10 +269,12 @@ def get_model_instance_segmentation(num_classes):
     return model
 
 
+
+
 def generate_confusion_matrix(data_loader_test, model, device, num_classes, output_folder):
     all_true_labels = []
     all_pred_labels = []
-
+    model.to(device)
     model.eval()
     for images, targets in data_loader_test:
         # Envoi sur GPU
@@ -290,7 +317,13 @@ def generate_confusion_matrix(data_loader_test, model, device, num_classes, outp
     all_pred_labels = np.array(all_pred_labels)
 
     conf_mat = confusion_matrix(all_true_labels, all_pred_labels, labels=range(num_classes))
-    conf_mat_pct = conf_mat.astype(float) / conf_mat.sum(axis=1, keepdims=True)
+
+    # Normalisation pour obtenir des pourcentages
+    with np.errstate(divide='ignore', invalid='ignore'):
+        conf_mat_pct = np.nan_to_num(
+            conf_mat.astype(float) / conf_mat.sum(axis=1, keepdims=True),
+            nan=0.0
+        )
 
     os.makedirs(output_folder, exist_ok=True)
     plt.figure(figsize=(8, 6))
@@ -303,6 +336,7 @@ def generate_confusion_matrix(data_loader_test, model, device, num_classes, outp
     plt.savefig(os.path.join(output_folder, "confusion_matrix.png"))
     plt.close()
     print("Confusion matrix saved in", output_folder)
+
 
 
 
@@ -319,15 +353,15 @@ def train_model(
     device,
     output_folder
 ):
-    # 1) Extraction
-    print("=== Étape 1 : Extraction & sauvegarde des slices ===")
-    extract_and_save_slices(
-        scans_folder,
-        masks_folder,
-        temp_folder,
-        slices_csv,
-        min_box_size=15  # Ajustez si besoin
-    )
+    # # 1) Extraction
+    # print("=== Étape 1 : Extraction & sauvegarde des slices ===")
+    # extract_and_save_slices(
+    #     scans_folder,
+    #     masks_folder,
+    #     temp_folder,
+    #     slices_csv,
+    #     min_box_size=20  # Ajustez si besoin
+    # )
 
     # 2) Dataset sans None
     print("=== Étape 2 : Création du Dataset sans None ===")
@@ -383,7 +417,7 @@ def train_model(
         momentum=0.9,
         weight_decay=0.0005
     )
-    lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+    #lr_scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
 
 
@@ -391,9 +425,9 @@ def train_model(
     print("=== Étape 5 : Entraînement ===")
     for epoch in range(num_epochs):
         print(f"Epoch {epoch+1}/{num_epochs}")
-        train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=10)
+        train_one_epoch(model, optimizer, train_loader, device, epoch, print_freq=1)
         evaluate(model, val_loader, device=device)
-        lr_scheduler.step()
+        #lr_scheduler.step()
 
     os.makedirs(output_folder, exist_ok=True)
     model_path = os.path.join(output_folder, "final_model.pth")
@@ -407,8 +441,8 @@ def train_model(
         test_loader,
         model,
         device,
-        num_classes,
-        output_folder
+        num_classes=3,
+        output_folder=output_folder
     )
 
     # 7) Évaluation finale
