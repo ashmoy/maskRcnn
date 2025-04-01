@@ -52,25 +52,7 @@
        <layout class="QHBoxLayout" name="nodeSelectionLayout"/>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="modelSelectionLayout">
-        <item>
-         <widget class="QLabel" name="modelPathLabel">
-          <property name="text">
-           <string>Model Folder</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLineEdit" name="lineEditModelPath"/>
-        </item>
-        <item>
-         <widget class="QPushButton" name="SearchModelFolder">
-          <property name="text">
-           <string>Choose</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
+       <layout class="QHBoxLayout" name="modelSelectionLayout"/>
       </item>
      </layout>
     </widget>
@@ -96,6 +78,23 @@
        <widget class="QProgressBar" name="PredScanProgressBar">
         <property name="value">
          <number>0</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="modelPathLabel">
+        <property name="text">
+         <string>Model Folder</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="lineEditModelPath"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="SearchModelFolder">
+        <property name="text">
+         <string>Choose</string>
         </property>
        </widget>
       </item>
