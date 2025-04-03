@@ -310,18 +310,84 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             slicer.mrmlScene.RemoveNode(self.currentSegNode)
             self.currentSegNode = None
         qt.QTimer.singleShot(0, lambda: self._load_segmentation_in_main_thread(seg_file))
-
+    def create_legend_node(self, volume_node):
+        """Crée et retourne un nœud de légende visible immédiatement"""
+        # Création du nœud
+        legend_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTextNode", "SegLegend")
+        
+        # Récupération des couleurs depuis le volume
+        display_node = volume_node.GetDisplayNode()
+        if not display_node:
+            display_node = volume_node.CreateDefaultDisplayNode()
+        
+        # Construction HTML manuelle (compatible Python 3.6+)
+        html_parts = [
+            '<div style="',
+            'background-color: rgba(0,0,0,0.7);',
+            'padding: 10px;',
+            'border-radius: 5px;',
+            'font-family: Arial;',
+            '">',
+            '<h4 style="margin:5px 0;color:white;">LÉGENDE</h4>'
+        ]
+        
+        for label, name in sorted(self.CLASS_NAMES.items()):
+            color = display_node.GetColor(label)
+            hex_color = "#{:02x}{:02x}{:02x}".format(
+                int(color[0]*255),
+                int(color[1]*255),
+                int(color[2]*255))
+            html_parts.append(
+                '<p style="margin:2px 0;">'
+                '<span style="color:{};font-size:20px;vertical-align:middle;">■</span> '
+                '<span style="color:white;font-size:16px;vertical-align:middle;">{}</span>'
+                '</p>'.format(hex_color, name))
+        
+        html_parts.append('</div>')
+        legend_node.SetText(''.join(html_parts))
+        
+        # Configuration d'affichage obligatoire
+        legend_display = legend_node.CreateDefaultDisplayNode()
+        legend_display.SetHorizontalAlignment(1)  # 1 = droite
+        legend_display.SetVerticalAlignment(0)    # 0 = haut
+        legend_display.SetBackgroundOpacity(0.7)
+        legend_display.SetFontSize(16)
+        legend_display.SetVisibility(True)
+        
+        return legend_node
     def _load_segmentation_in_main_thread(self, seg_file):
         try:
+            # Chargement du volume
             loadedNodes = slicer.util.loadVolume(seg_file)
-            if isinstance(loadedNodes, dict) and "volumeNode" in loadedNodes:
-                self.currentSegNode = loadedNodes["volumeNode"]
-                # Si le scan de base est déjà chargé (par exemple via self.MRMLNode_scan),
-                # le mettre en arrière-plan et la segmentation en label pour obtenir une superposition.
-                if self.MRMLNode_scan:
-                    slicer.util.setSliceViewerLayers(background=self.MRMLNode_scan, label=self.currentSegNode)
+            if not loadedNodes or "volumeNode" not in loadedNodes:
+                raise ValueError("Échec du chargement du volume")
+                
+            self.currentSegNode = loadedNodes["volumeNode"]
+            
+            # Suppression de l'ancienne légende
+            old_legend = slicer.mrmlScene.GetFirstNodeByName("SegLegend")
+            if old_legend:
+                slicer.mrmlScene.RemoveNode(old_legend)
+            
+            # Création et affichage de la légende
+            self.logic.create_legend_node(self.currentSegNode)
+            
+            # Configuration de la vue
+            if hasattr(self, 'MRMLNode_scan') and self.MRMLNode_scan:
+                slicer.util.setSliceViewerLayers(
+                    background=self.MRMLNode_scan,
+                    label=self.currentSegNode
+                )
+            
+            # Rafraîchissement forcé
+            slicer.util.forceRenderAllViews()
+            
         except Exception as e:
-            qt.QMessageBox.warning(self.parent, 'Error', f'Failed to load segmentation: {str(e)}')
+            import traceback
+            traceback.print_exc()
+            qt.QMessageBox.critical(self.parent, 
+                                "Erreur de chargement", 
+                                f"Erreur lors de l'affichage :\n{str(e)}")
 
 
     def onCancel(self):
@@ -371,7 +437,7 @@ class CLICLogic(ScriptedLoadableModuleLogic):
         model.eval()
         return model
 
-    def process_nii_file(self, model, nii_path, device, progress_callback=None, log_callback=None, score_threshold=0.5):
+    def process_nii_file(self, model, nii_path, device, progress_callback=None, log_callback=None, score_threshold=0.7):
         nib_vol = nib.load(nii_path)
         vol_data = nib_vol.get_fdata(dtype=np.float32)
         H, W, Z = vol_data.shape
@@ -463,22 +529,46 @@ class CLICLogic(ScriptedLoadableModuleLogic):
                 vol_data, nib_ref, detections, counts = self.process_nii_file(model, nii_file, device, progress_callback, log_callback)
                 if log_callback:
                     log_callback("Finished processing file: " + nii_file)
-                    log_callback("Summary for file " + os.path.basename(nii_file) + ":")
+                    log_callback("Label to class mapping:")
+                    for label, name in self.CLASS_NAMES.items():
+                        log_callback(f"  Label {label}: {name}")
+                    log_callback("Counts:")
                     for cls in counts:
                         log_callback(f"  {cls}: Left = {counts[cls]['left']}, Right = {counts[cls]['right']}")
+
                 seg_data = np.zeros(vol_data.shape, dtype=np.int16)
                 for det in detections:
                     z = det["slice_z"]
                     mask = det["mask_2d"]
                     label = det["label"]
                     seg_data[..., z][mask] = label
+
                 base_name = os.path.basename(nii_file).replace(".nii.gz", "").replace(".nii", "")
-                output_filename = f"{base_name}_seg.nii.gz"
-                output_path = os.path.join(output_dir, output_filename)
-                self.save_nii(seg_data, nib_ref, output_path)
-                seg_files.append(output_path)
+                scan_output_folder = os.path.join(output_dir, base_name)
+                os.makedirs(scan_output_folder, exist_ok=True)
+                self._embed_visual_legend(seg_data)
+
+                output_seg_path = os.path.join(scan_output_folder, f"{base_name}_seg.nii.gz")
+                output_summary_path = os.path.join(scan_output_folder, f"{base_name}_summary.txt")
+
+                # Sauvegarde avec métadonnées dans le header NIfTI
+                nii_img = nib.Nifti1Image(seg_data.astype(np.int16), nib_ref.affine, nib_ref.header)
+                nii_img.header['descrip'] = str(self.CLASS_NAMES)  # Ajout du mapping dans les métadonnées
+                nib.save(nii_img, output_seg_path)
+
+                # Sauvegarde du fichier texte avec la légende
+                with open(output_summary_path, "w") as summary_file:
+                    summary_file.write("Label to Class Mapping:\n")
+                    for label, name in self.CLASS_NAMES.items():
+                        summary_file.write(f"Label {label}: {name}\n")
+                    summary_file.write("\nCounts:\n")
+                    for cls in counts:
+                        summary_file.write(f"{cls}: Left = {counts[cls]['left']}, Right = {counts[cls]['right']}\n")
+
+                seg_files.append(output_seg_path)
                 if seg_files and display_callback:
                     display_callback(seg_files[-1])
+
             if log_callback:
                 log_callback("Processing completed successfully.")
             self.seg_files = seg_files
@@ -486,3 +576,58 @@ class CLICLogic(ScriptedLoadableModuleLogic):
             if log_callback:
                 log_callback(f"Error during processing: {str(e)}")
             raise
+    def _embed_visual_legend(self, volume_data):
+        """Ajoute une légende horizontale en bas (gauche ➝ droite) correctement orientée."""
+        from PIL import Image, ImageDraw, ImageFont
+        import numpy as np
+
+        h, w, d = volume_data.shape
+        legend_height = 60
+
+        print(f"[DEBUG] volume shape = (h={h}, w={w}, d={d})")
+
+        # Police lisible
+        try:
+            font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
+        except:
+            font = ImageFont.load_default()
+
+        for z in range(d):
+            print(f"[DEBUG] Processing slice z={z}")
+
+            # Créer image PIL horizontale
+            legend_img = Image.new("L", (w, legend_height), color=0)
+            draw = ImageDraw.Draw(legend_img)
+
+            spacing = 200
+            box_size = 25
+            start_x = 30
+            y = 15
+
+            for i, (label, name) in enumerate(self.CLASS_NAMES.items()):
+                x = start_x + i * spacing
+                draw.rectangle([x, y, x + box_size, y + box_size], fill=int(label))
+                draw.text((x + box_size + 10, y), name, font=font, fill=255)
+
+            # Convertir l’image et la retourner verticalement
+            legend_array = np.array(legend_img)
+            legend_array_flipped = np.flipud(legend_array)  # ✅ flip vertical
+
+            print(f"[DEBUG] legend_array_flipped shape: {legend_array_flipped.shape}")
+
+            # Injection en bas de l'image
+            y_start = h - legend_height
+            y_end = h
+
+            mask = legend_array_flipped > 0
+            sub_volume = volume_data[y_start:y_end, :, z]
+            sub_volume[mask] = legend_array_flipped[mask]
+            volume_data[y_start:y_end, :, z] = sub_volume
+
+            # Debug position
+            indices = np.argwhere(mask)
+            if indices.size > 0:
+                mapped_y = y_start + indices[0][0]
+                mapped_x = indices[0][1]
+                print(f"[DEBUG] Will write first non-zero pixel to volume_data[{mapped_y}, {mapped_x}, {z}]")
+
