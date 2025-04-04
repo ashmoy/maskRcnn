@@ -23,6 +23,7 @@ import zipfile
 import queue
 import subprocess
 import sys
+import vtk
 
 def PathFromNode(node):
     storageNode = node.GetStorageNode()
@@ -285,7 +286,9 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self.ui.TimerLabel.setText(f"Time elapsed: {current_time - start_time:.2f}s")
                 self.process_ui_queue()
                 time.sleep(0.1)
-
+                        # Vérifie que le modèle a bien produit une segmentation et la recharge
+            if self.logic.seg_files:
+                self.load_segmentation(self.logic.seg_files[-1])
             self.ui_queue.put(("log", "Segmentation completed successfully!"))
         except Exception as e:
             self.ui_queue.put(("log", f"An error occurred during segmentation: {str(e)}"))
@@ -309,86 +312,116 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if self.currentSegNode:
             slicer.mrmlScene.RemoveNode(self.currentSegNode)
             self.currentSegNode = None
-        qt.QTimer.singleShot(0, lambda: self._load_segmentation_in_main_thread(seg_file))
-    def create_legend_node(self, volume_node):
-        """Crée et retourne un nœud de légende visible immédiatement"""
-        # Création du nœud
-        legend_node = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLTextNode", "SegLegend")
-        
-        # Récupération des couleurs depuis le volume
-        display_node = volume_node.GetDisplayNode()
-        if not display_node:
-            display_node = volume_node.CreateDefaultDisplayNode()
-        
-        # Construction HTML manuelle (compatible Python 3.6+)
-        html_parts = [
-            '<div style="',
-            'background-color: rgba(0,0,0,0.7);',
-            'padding: 10px;',
-            'border-radius: 5px;',
-            'font-family: Arial;',
-            '">',
-            '<h4 style="margin:5px 0;color:white;">LÉGENDE</h4>'
-        ]
-        
-        for label, name in sorted(self.CLASS_NAMES.items()):
-            color = display_node.GetColor(label)
-            hex_color = "#{:02x}{:02x}{:02x}".format(
-                int(color[0]*255),
-                int(color[1]*255),
-                int(color[2]*255))
-            html_parts.append(
-                '<p style="margin:2px 0;">'
-                '<span style="color:{};font-size:20px;vertical-align:middle;">■</span> '
-                '<span style="color:white;font-size:16px;vertical-align:middle;">{}</span>'
-                '</p>'.format(hex_color, name))
-        
-        html_parts.append('</div>')
-        legend_node.SetText(''.join(html_parts))
-        
-        # Configuration d'affichage obligatoire
-        legend_display = legend_node.CreateDefaultDisplayNode()
-        legend_display.SetHorizontalAlignment(1)  # 1 = droite
-        legend_display.SetVerticalAlignment(0)    # 0 = haut
-        legend_display.SetBackgroundOpacity(0.7)
-        legend_display.SetFontSize(16)
-        legend_display.SetVisibility(True)
-        
-        return legend_node
+
+        def load_and_attach():
+            self._load_segmentation_in_main_thread(seg_file)
+            self.attachCornerLegend()
+
+
+        qt.QTimer.singleShot(0, load_and_attach)
+
+    
     def _load_segmentation_in_main_thread(self, seg_file):
         try:
-            # Chargement du volume
-            loadedNodes = slicer.util.loadVolume(seg_file)
-            if not loadedNodes or "volumeNode" not in loadedNodes:
-                raise ValueError("Échec du chargement du volume")
-                
-            self.currentSegNode = loadedNodes["volumeNode"]
-            
-            # Suppression de l'ancienne légende
+            # Chargement du volume segmenté comme segmentation (pas comme scan)
+            loadedNode = slicer.util.loadSegmentation(seg_file)
+            if not loadedNode:
+                raise ValueError("Échec du chargement de la segmentation")
+
+            self.currentSegNode = loadedNode
+
+            # Supprimer ancienne légende
             old_legend = slicer.mrmlScene.GetFirstNodeByName("SegLegend")
             if old_legend:
                 slicer.mrmlScene.RemoveNode(old_legend)
-            
-            # Création et affichage de la légende
-            self.logic.create_legend_node(self.currentSegNode)
-            
-            # Configuration de la vue
+
+
+
+            # Superposer segmentation avec le scan déjà chargé
             if hasattr(self, 'MRMLNode_scan') and self.MRMLNode_scan:
                 slicer.util.setSliceViewerLayers(
                     background=self.MRMLNode_scan,
-                    label=self.currentSegNode
+                    label=self.currentSegNode,
+                    labelOpacity=0.8
                 )
-            
-            # Rafraîchissement forcé
+
             slicer.util.forceRenderAllViews()
-            
+            self.attachCornerLegend()
+
         except Exception as e:
             import traceback
             traceback.print_exc()
-            qt.QMessageBox.critical(self.parent, 
-                                "Erreur de chargement", 
+            qt.QMessageBox.critical(self.parent,
+                                "Erreur de chargement",
                                 f"Erreur lors de l'affichage :\n{str(e)}")
 
+    def attachCornerLegend(self):
+        import vtk
+
+        layoutManager = slicer.app.layoutManager()
+        label_colors = {
+            1: (0.4, 0.8, 0.4),     # Buccal
+            2: (1.0, 0.85, 0.3),    # Bicortical
+            3: (0.8, 0.5, 0.5),     # Palatal
+        }
+        label_names = {
+            1: "Buccal",
+            2: "Bicortical",
+            3: "Palatal",
+        }
+
+        for viewName in ["Red", "Yellow", "Green"]:
+            try:
+                view = layoutManager.sliceWidget(viewName).sliceView()
+                renderer = view.renderWindow().GetRenderers().GetFirstRenderer()
+
+                # Supprimer anciennes légendes
+                for actor in list(renderer.GetActors2D()):
+                    if hasattr(actor, "_isLegendActor") and actor._isLegendActor:
+                        renderer.RemoveActor(actor)
+
+                base_y = 0.85
+                spacing = 0.06
+                font_size = 16
+
+                for i, label in enumerate(label_names):
+                    color = label_colors[label]
+                    name = label_names[label]
+
+                    # Texte unique : carré coloré + nom
+                    full_text = f"■ {name}"
+                    text_actor = vtk.vtkTextActor()
+                    text_actor.SetInput(full_text)
+
+                    prop = text_actor.GetTextProperty()
+                    prop.SetFontSize(font_size)
+                    prop.SetFontFamilyToArial()
+                    prop.SetColor(*color)  # Le carré hérite de cette couleur
+                    prop.BoldOn()
+                    prop.ShadowOff()
+
+                    text_actor.GetPositionCoordinate().SetCoordinateSystemToNormalizedDisplay()
+                    text_actor.SetPosition(0.77, base_y - i * spacing)
+                    text_actor._isLegendActor = True
+                    renderer.AddActor2D(text_actor)
+
+                view.forceRender()
+
+            except Exception as e:
+                print(f"[WARN] Could not update annotation for {viewName} view: {e}")
+
+
+
+
+    def reapplyLegend(self, sliceView, text):
+        try:
+            renderer = sliceView.renderWindow().GetRenderers().GetFirstRenderer()
+            if hasattr(sliceView, "cornerAnnotation") and sliceView.cornerAnnotation:
+                sliceView.cornerAnnotation.SetText(0, text)
+                renderer.AddViewProp(sliceView.cornerAnnotation)
+                sliceView.forceRender()
+        except Exception as e:
+            print(f"[WARN] Failed to reapply legend: {e}")
 
     def onCancel(self):
         if self.logic:
@@ -488,6 +521,8 @@ class CLICLogic(ScriptedLoadableModuleLogic):
                 progress_callback(progress)
         return vol_data, nib_vol, all_detections, slice_counts
 
+
+
     def normalize_slice(self, slice_2d):
         mn, mx = slice_2d.min(), slice_2d.max()
         if (mx - mn) > 1e-8:
@@ -546,7 +581,7 @@ class CLICLogic(ScriptedLoadableModuleLogic):
                 base_name = os.path.basename(nii_file).replace(".nii.gz", "").replace(".nii", "")
                 scan_output_folder = os.path.join(output_dir, base_name)
                 os.makedirs(scan_output_folder, exist_ok=True)
-                self._embed_visual_legend(seg_data)
+                # self._embed_visual_legend(seg_data)
 
                 output_seg_path = os.path.join(scan_output_folder, f"{base_name}_seg.nii.gz")
                 output_summary_path = os.path.join(scan_output_folder, f"{base_name}_summary.txt")
@@ -568,7 +603,7 @@ class CLICLogic(ScriptedLoadableModuleLogic):
                 seg_files.append(output_seg_path)
                 if seg_files and display_callback:
                     display_callback(seg_files[-1])
-
+                # self.show_visual_legend()
             if log_callback:
                 log_callback("Processing completed successfully.")
             self.seg_files = seg_files
@@ -576,58 +611,5 @@ class CLICLogic(ScriptedLoadableModuleLogic):
             if log_callback:
                 log_callback(f"Error during processing: {str(e)}")
             raise
-    def _embed_visual_legend(self, volume_data):
-        """Ajoute une légende horizontale en bas (gauche ➝ droite) correctement orientée."""
-        from PIL import Image, ImageDraw, ImageFont
-        import numpy as np
 
-        h, w, d = volume_data.shape
-        legend_height = 60
-
-        print(f"[DEBUG] volume shape = (h={h}, w={w}, d={d})")
-
-        # Police lisible
-        try:
-            font = ImageFont.truetype("DejaVuSans-Bold.ttf", 22)
-        except:
-            font = ImageFont.load_default()
-
-        for z in range(d):
-            print(f"[DEBUG] Processing slice z={z}")
-
-            # Créer image PIL horizontale
-            legend_img = Image.new("L", (w, legend_height), color=0)
-            draw = ImageDraw.Draw(legend_img)
-
-            spacing = 200
-            box_size = 25
-            start_x = 30
-            y = 15
-
-            for i, (label, name) in enumerate(self.CLASS_NAMES.items()):
-                x = start_x + i * spacing
-                draw.rectangle([x, y, x + box_size, y + box_size], fill=int(label))
-                draw.text((x + box_size + 10, y), name, font=font, fill=255)
-
-            # Convertir l’image et la retourner verticalement
-            legend_array = np.array(legend_img)
-            legend_array_flipped = np.flipud(legend_array)  # ✅ flip vertical
-
-            print(f"[DEBUG] legend_array_flipped shape: {legend_array_flipped.shape}")
-
-            # Injection en bas de l'image
-            y_start = h - legend_height
-            y_end = h
-
-            mask = legend_array_flipped > 0
-            sub_volume = volume_data[y_start:y_end, :, z]
-            sub_volume[mask] = legend_array_flipped[mask]
-            volume_data[y_start:y_end, :, z] = sub_volume
-
-            # Debug position
-            indices = np.argwhere(mask)
-            if indices.size > 0:
-                mapped_y = y_start + indices[0][0]
-                mapped_x = indices[0][1]
-                print(f"[DEBUG] Will write first non-zero pixel to volume_data[{mapped_y}, {mapped_x}, {z}]")
 
