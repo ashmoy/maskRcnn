@@ -62,7 +62,9 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.output_folder = None
         self.goup_output_files = False
         self.scan_count = 0
-        self.currentSegNode = None  # Pour suivre le volume affiché
+        # On va conserver dans des listes tous les scans et toutes les segmentations chargées
+        self.scanNodes = []
+        self.segmentationNodes = []
         self.ui_queue = queue.Queue()  # File pour synchroniser l'UI
 
     def UpdateSaveType(self, checked):
@@ -84,9 +86,6 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Instanciation de l'updater pour les signaux
         self.progressUpdater = ProgressUpdater()
-
-        # La progressBar "PredScanProgressBar" sera utilisée pour le téléchargement,
-        # et "progressBar" pour le traitement des slices.
         self.progressUpdater.progressChanged.connect(lambda value: self.ui.progressBar.setValue(value))
         self.progressUpdater.logChanged.connect(lambda text: self.ui.logTextEdit.append(text))
 
@@ -98,9 +97,8 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.PredictionButton.clicked.connect(self.onPredictButton)
         self.ui.CancelButton.clicked.connect(self.onCancel)
 
-        # Initialisation de la visibilité des éléments d'interface
         self.ui.progressBar.setVisible(False)
-        self.ui.PredScanProgressBar.setVisible(False)  # Masquer la barre de progression au démarrage
+        self.ui.PredScanProgressBar.setVisible(False)
         self.RunningUI(False)
 
         self.initializeParameterNode()
@@ -117,7 +115,6 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.input_path = PathFromNode(self.MRMLNode_scan)
             self.scan_count = 1
             self.ui.PrePredInfo.setText("Number of scans to process: 1")
-            # Charger le scan dans Slicer (si ce n'est pas déjà fait)
             self.load_nii_in_slicer(self.input_path)
             return True
         return False
@@ -129,7 +126,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         model_path = os.path.join(default_model_folder, "final_model.pth")
         try:
             self.ui.PredScanLabel.setText("Downloading model...")
-            self.ui.PredScanProgressBar.setVisible(True)  # Afficher la barre de progression
+            self.ui.PredScanProgressBar.setVisible(True)
             response = requests.get(model_url, stream=True)
             response.raise_for_status()
             total_size = int(response.headers.get('content-length', 0))
@@ -148,7 +145,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             qt.QMessageBox.warning(self.parent, 'Error', f"Failed to download model: {str(e)}")
             self.ui.PredScanLabel.setText("Error during download.")
         finally:
-            self.ui.PredScanProgressBar.setVisible(False)  # Masquer la barre après téléchargement
+            self.ui.PredScanProgressBar.setVisible(False)
 
     def onSearchScanButton(self):
         scan_folder = qt.QFileDialog.getExistingDirectory(self.parent, "Select a scan folder")
@@ -169,20 +166,14 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.ui.SaveFolderLineEdit.setText(save_folder)
 
     def check_dependencies(self):
-        # Ajouter un message dans les logs pour indiquer le début de la vérification
         self.ui_queue.put(("log", "Checking required libraries..."))
-
         required_libraries = ["torch", "nibabel", "numpy", "scipy", "requests"]
         missing_libraries = []
-
-        # Vérifier les bibliothèques requises
         for lib in required_libraries:
             try:
                 __import__(lib)
             except ImportError:
                 missing_libraries.append(lib)
-
-        # Si des bibliothèques sont manquantes, proposer de les installer
         if missing_libraries:
             self.ui_queue.put(("log", f"Missing libraries detected: {', '.join(missing_libraries)}"))
             reply = qt.QMessageBox.question(
@@ -192,19 +183,16 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 "Do you want to install them automatically?",
                 qt.QMessageBox.Yes | qt.QMessageBox.No
             )
-
             if reply == qt.QMessageBox.Yes:
                 for lib in missing_libraries:
                     try:
                         self.ui_queue.put(("log", f"Installing library: {lib}..."))
                         if lib == "torch":
-                            # Installation spécifique pour PyTorch avec CUDA 11.8
                             subprocess.check_call([
                                 sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio",
                                 "--index-url", "https://download.pytorch.org/whl/cu118"
                             ])
                         else:
-                            # Installation standard pour les autres bibliothèques
                             subprocess.check_call([sys.executable, "-m", "pip", "install", lib])
                     except Exception as e:
                         self.ui_queue.put(("log", f"Failed to install {lib}: {str(e)}"))
@@ -214,8 +202,6 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                             f"Failed to install {lib}. Error: {str(e)}"
                         )
                         return False
-
-                # Réessayer d'importer les bibliothèques après installation
                 for lib in missing_libraries:
                     try:
                         __import__(lib)
@@ -235,13 +221,10 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     "Please install the missing libraries manually before proceeding."
                 )
                 return False
-
-        # Ajouter un message dans les logs pour indiquer la fin de la vérification
         self.ui_queue.put(("log", "All required libraries are installed and ready to use."))
         return True
 
     def onPredictButton(self):
-        # Vérifier les dépendances
         if not self.check_dependencies():
             return
         if not self.input_path:
@@ -257,14 +240,12 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             "output_dir": self.output_folder,
         }
 
-        # Définition des callbacks pour progression, log et affichage.
         def update_progress(progress):
             self.ui_queue.put(("progress", progress))
 
         def update_log(message):
             self.ui_queue.put(("log", message))
 
-        # Callback modifié pour gérer deux types d'actions : "loadScan" et "segmentation"
         def display_callback(action, file_path):
             self.ui_queue.put((action, file_path))
 
@@ -272,9 +253,8 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.segmentationLoadedEvent = threading.Event()
 
         try:
-            # On ne charge pas initialement un scan ; le traitement se fait dans la boucle de la méthode process
             self.RunningUI(True)
-            # Passage du segmentationLoadedEvent en argument supplémentaire au processus
+            # Passage du segmentationLoadedEvent au processus
             self.processThread = threading.Thread(
                 target=self.logic.process,
                 args=(param, update_progress, update_log, display_callback, self.segmentationLoadedEvent)
@@ -288,7 +268,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self.ui.TimerLabel.setText(f"Time elapsed: {current_time - start_time:.2f}s")
                 self.process_ui_queue()
                 time.sleep(0.1)
-            self.process_ui_queue()  # Traiter les éventuels messages restants
+            self.process_ui_queue()
             self.ui_queue.put(("log", "Segmentation completed successfully!"))
         except Exception as e:
             self.ui_queue.put(("log", f"An error occurred during segmentation: {str(e)}"))
@@ -296,7 +276,6 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.RunningUI(False)
 
     def process_ui_queue(self):
-        """Traite les messages dans la file d'attente pour mettre à jour l'interface utilisateur."""
         while not self.ui_queue.empty():
             action, data = self.ui_queue.get()
             if action == "progress":
@@ -308,111 +287,74 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             elif action == "segmentation":
                 self.load_segmentation(data)
 
+    # Modification : Les scans et segmentations sont ajoutés à des listes sans effacer les précédents.
     def load_segmentation(self, seg_file):
-        if self.currentSegNode:
-            slicer.mrmlScene.RemoveNode(self.currentSegNode)
-            self.currentSegNode = None
-
         def load_and_attach():
-            self._load_segmentation_in_main_thread(seg_file)
-            self.attachCornerLegend()
-            # Une fois la segmentation chargée, notifier le thread de traitement
+            segNode = slicer.util.loadSegmentation(seg_file)
+            if not segNode:
+                qt.QMessageBox.critical(self.parent,
+                                        "Erreur de chargement",
+                                        f"Échec du chargement de la segmentation pour :\n{seg_file}")
+                return
+            # Attribuer un nom unique (par exemple, le nom de fichier)
+            segNode.SetName(os.path.basename(seg_file))
+            # Conserver ce nœud dans la liste des segmentations
+            self.segmentationNodes.append(segNode)
+            # Mettre à jour le nœud actif pour la visualisation
+            self.currentSegNode = segNode
+            self.attachCornerLegend(segNode)
             if hasattr(self, 'segmentationLoadedEvent') and self.segmentationLoadedEvent:
                 self.segmentationLoadedEvent.set()
-
         qt.QTimer.singleShot(0, load_and_attach)
 
-    def _load_segmentation_in_main_thread(self, seg_file):
-        try:
-            # Chargement du volume segmenté comme segmentation (pas comme scan)
-            loadedNode = slicer.util.loadSegmentation(seg_file)
-            if not loadedNode:
-                raise ValueError("Échec du chargement de la segmentation")
-
-            self.currentSegNode = loadedNode
-
-            # Supprimer l'ancienne légende (si présente)
-            old_legend = slicer.mrmlScene.GetFirstNodeByName("SegLegend")
-            if old_legend:
-                slicer.mrmlScene.RemoveNode(old_legend)
-
-            # Superposer la segmentation avec le scan déjà chargé
-            if hasattr(self, 'MRMLNode_scan') and self.MRMLNode_scan:
-                slicer.util.setSliceViewerLayers(
-                    background=self.MRMLNode_scan,
-                    label=self.currentSegNode,
-                    labelOpacity=0.8
-                )
-
-            slicer.util.forceRenderAllViews()
-            self.attachCornerLegend()
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            qt.QMessageBox.critical(self.parent,
-                                    "Erreur de chargement",
-                                    f"Erreur lors de l'affichage :\n{str(e)}")
-
-    def attachCornerLegend(self):
+    # Modification : on ne modifie plus self.currentSegNode pour supprimer les anciens.
+    def attachCornerLegend(self, segmentationNode=None):
         import vtk
-
         layoutManager = slicer.app.layoutManager()
-
-        if not self.currentSegNode:
+        if segmentationNode is None:
+            segmentationNode = self.currentSegNode
+        if not segmentationNode:
             print("[WARN] Aucun nœud de segmentation actif.")
             return
-
-        segmentation = self.currentSegNode.GetSegmentation()
+        segmentation = segmentationNode.GetSegmentation()
         segmentIDs = vtk.vtkStringArray()
         segmentation.GetSegmentIDs(segmentIDs)
-
         label_names = {
             1: "Buccal",
             2: "Bicortical",
             3: "Palatal",
         }
-
         for viewName in ["Red", "Yellow", "Green"]:
             try:
                 view = layoutManager.sliceWidget(viewName).sliceView()
                 renderer = view.renderWindow().GetRenderers().GetFirstRenderer()
-
-                # Supprimer les anciennes légendes
+                # Supprimer les anciennes légendes spécifiques à ce nœud
                 for actor in list(renderer.GetActors2D()):
                     if hasattr(actor, "_isLegendActor") and actor._isLegendActor:
                         renderer.RemoveActor(actor)
-
                 base_y = 0.85
                 spacing = 0.06
                 font_size = 16
-
                 for i in range(segmentIDs.GetNumberOfValues()):
                     seg_id = segmentIDs.GetValue(i)
                     segment = segmentation.GetSegment(seg_id)
                     color = segment.GetColor()
-
                     label_value = segment.GetLabelValue()
                     name = label_names.get(label_value, f"Label {label_value}")
-
                     full_text = f"■ {name}"
                     text_actor = vtk.vtkTextActor()
                     text_actor.SetInput(full_text)
-
                     prop = text_actor.GetTextProperty()
                     prop.SetFontSize(font_size)
                     prop.SetFontFamilyToArial()
                     prop.SetColor(*color)
                     prop.BoldOn()
                     prop.ShadowOff()
-
                     text_actor.GetPositionCoordinate().SetCoordinateSystemToNormalizedDisplay()
                     text_actor.SetPosition(0.77, base_y - i * spacing)
                     text_actor._isLegendActor = True
                     renderer.AddActor2D(text_actor)
-
                 view.forceRender()
-
             except Exception as e:
                 print(f"[WARN] Could not update annotation for {viewName} view: {e}")
 
@@ -442,21 +384,22 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     def initializeParameterNode(self):
         pass
 
+    # Modification : lors du chargement du scan, nous ne supprimons pas les scans précédents.
     def load_nii_in_slicer(self, nii_file):
         if not os.path.exists(nii_file):
             raise FileNotFoundError(f"NIfTI file not found: {nii_file}")
         volume_node = slicer.util.loadVolume(nii_file)
         slicer.app.layoutManager().setLayout(slicer.vtkMRMLLayoutNode.SlicerLayoutFourUpView)
         slicer.util.setSliceViewerLayers(background=volume_node)
-        # Conserver une référence au scan pour pouvoir superposer la segmentation
         self.MRMLNode_scan = volume_node
+        self.scanNodes.append(volume_node)
 
 class CLICLogic(ScriptedLoadableModuleLogic):
     CLASS_NAMES = {1: "buccal", 2: "bicortical", 3: "palatal"}
 
     def __init__(self):
         ScriptedLoadableModuleLogic.__init__(self)
-        self.seg_files = []  # Pour stocker les segmentations sauvegardées
+        self.seg_files = []  # Pour stocker les chemins des segmentations sauvegardées
         self.cancelRequested = False
 
     def get_model_instance_segmentation(self, num_classes):
@@ -537,7 +480,7 @@ class CLICLogic(ScriptedLoadableModuleLogic):
         nii_img = nib.Nifti1Image(vol_np.astype(np.int16), nib_ref.affine, nib_ref.header)
         nib.save(nii_img, out_path)
 
-    # Modification : ajout de l'argument sync_event
+    # L'argument sync_event permet de synchroniser avec l'UI après le chargement de chaque segmentation.
     def process(self, parameters, progress_callback=None, log_callback=None, display_callback=None, sync_event=None):
         try:
             self.cancelRequested = False
@@ -565,18 +508,12 @@ class CLICLogic(ScriptedLoadableModuleLogic):
                     break
                 if log_callback:
                     log_callback("Processing file: " + nii_file)
-                # Envoyer la commande pour charger le scan correspondant
+                # Charger le scan correspondant
                 if display_callback:
                     display_callback("loadScan", nii_file)
                 vol_data, nib_ref, detections, counts = self.process_nii_file(model, nii_file, device, progress_callback, log_callback)
                 if log_callback:
                     log_callback("Finished processing file: " + nii_file)
-                    log_callback("Label to class mapping:")
-                    for label, name in self.CLASS_NAMES.items():
-                        log_callback(f"  Label {label}: {name}")
-                    # log_callback("Counts:")
-                    # for cls in counts:
-                    #     log_callback(f"  {cls}: Left = {counts[cls]['left']}, Right = {counts[cls]['right']}")
                 seg_data = np.zeros(vol_data.shape, dtype=np.int16)
                 for det in detections:
                     z = det["slice_z"]
@@ -591,11 +528,11 @@ class CLICLogic(ScriptedLoadableModuleLogic):
                 nii_img.header['descrip'] = str(self.CLASS_NAMES)
                 nib.save(nii_img, output_seg_path)
                 seg_files.append(output_seg_path)
-                # Envoyer la commande pour charger la segmentation et attendre que ce chargement soit terminé
+                # Charger la segmentation et attendre que ce chargement soit terminé avant de passer au suivant
                 if display_callback:
                     display_callback("segmentation", output_seg_path)
                 if sync_event is not None:
-                    sync_event.wait()  # Attendre que l'UI signale la fin du chargement
+                    sync_event.wait()
                     sync_event.clear()
             if log_callback:
                 log_callback("Processing completed successfully.")
@@ -604,5 +541,4 @@ class CLICLogic(ScriptedLoadableModuleLogic):
             if log_callback:
                 log_callback(f"Error during processing: {str(e)}")
             raise
-
 
