@@ -66,6 +66,9 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.scanNodes = []
         self.segmentationNodes = []
         self.ui_queue = queue.Queue()  # File pour synchroniser l'UI
+        
+        # Pour garder une référence à l'observateur sur la sélection dans le Subject Hierarchy
+        self._shObserverTag = None
 
     def UpdateSaveType(self, checked):
         self.goup_output_files = checked
@@ -103,6 +106,14 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.initializeParameterNode()
 
+        # === Ajout d'un observateur sur le Subject Hierarchy pour suivre les changements de sélection ===
+        shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)
+        if shNode:
+            # On observe l'événement de modification dans la hiérarchie (lorsqu'un item est sélectionné ou modifié)
+            self._shObserverTag = shNode.AddObserver("SubjectHierarchyItemModifiedEvent", self.onSubjectHierarchyModified)
+        else:
+            print("[WARN] Impossible d'obtenir le Subject Hierarchy Node.")
+
     def SwitchInputExtension(self, index):
         if index == 1:
             self.ui.ScanPathLabel.setText('DICOM Folder')
@@ -118,6 +129,18 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.load_nii_in_slicer(self.input_path)
             return True
         return False
+
+    # Callback appelé lorsque la sélection dans le Subject Hierarchy change.
+    # Si le nœud actif est un nœud de segmentation, on ré-applique la légende.
+    def onSubjectHierarchyModified(self, caller, event):
+        shNode = caller
+        activeItemID = shNode.GetActiveItemID()
+        if activeItemID:
+            activeNode = shNode.GetItemDataNode(activeItemID)
+            # Vérifier que le nœud actif est de type segmentation
+            if activeNode and activeNode.IsA("vtkMRMLSegmentationNode"):
+                self.currentSegNode = activeNode
+                self.attachCornerLegend(activeNode)
 
     def onModelDownloadButton(self):
         model_url = "https://github.com/ashmoy/maskRcnn/releases/download/model/final_model.pth"
@@ -287,7 +310,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             elif action == "segmentation":
                 self.load_segmentation(data)
 
-    # Modification : Les scans et segmentations sont ajoutés à des listes sans effacer les précédents.
+    # Les scans et segmentations sont ajoutés à des listes sans effacer les précédents.
     def load_segmentation(self, seg_file):
         def load_and_attach():
             segNode = slicer.util.loadSegmentation(seg_file)
@@ -296,18 +319,18 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                                         "Erreur de chargement",
                                         f"Échec du chargement de la segmentation pour :\n{seg_file}")
                 return
-            # Attribuer un nom unique (par exemple, le nom de fichier)
+            # Attribuer un nom unique (ex: le nom de fichier)
             segNode.SetName(os.path.basename(seg_file))
             # Conserver ce nœud dans la liste des segmentations
             self.segmentationNodes.append(segNode)
-            # Mettre à jour le nœud actif pour la visualisation
+            # Définir ce nœud comme actif pour la visualisation
             self.currentSegNode = segNode
             self.attachCornerLegend(segNode)
             if hasattr(self, 'segmentationLoadedEvent') and self.segmentationLoadedEvent:
                 self.segmentationLoadedEvent.set()
         qt.QTimer.singleShot(0, load_and_attach)
 
-    # Modification : on ne modifie plus self.currentSegNode pour supprimer les anciens.
+    # Ici nous imposons les couleurs choisies et affichons toujours la légende des trois classes.
     def attachCornerLegend(self, segmentationNode=None):
         import vtk
         layoutManager = slicer.app.layoutManager()
@@ -316,31 +339,40 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if not segmentationNode:
             print("[WARN] Aucun nœud de segmentation actif.")
             return
+
+        # Couleurs fixes et noms pour les trois classes
+        label_names = {1: "Buccal", 2: "Bicortical", 3: "Palatal"}
+        fixed_colors = {1: (0.0, 1.0, 0.0), 2: (1.0, 1.0, 0.0), 3: (0.6, 0.4, 0.2)}
+
+
+        # Mise à jour des couleurs des segments dans le nœud de segmentation
         segmentation = segmentationNode.GetSegmentation()
         segmentIDs = vtk.vtkStringArray()
         segmentation.GetSegmentIDs(segmentIDs)
-        label_names = {
-            1: "Buccal",
-            2: "Bicortical",
-            3: "Palatal",
-        }
+        for i in range(segmentIDs.GetNumberOfValues()):
+            seg_id = segmentIDs.GetValue(i)
+            segment = segmentation.GetSegment(seg_id)
+            # On suppose que le label est stocké sous forme d'entier dans GetLabelValue()
+            label_value = segment.GetLabelValue()
+            if label_value in fixed_colors:
+                segment.SetColor(*fixed_colors[label_value])
+
+        # Affichage de la légende avec nos couleurs fixes pour les trois classes
         for viewName in ["Red", "Yellow", "Green"]:
             try:
                 view = layoutManager.sliceWidget(viewName).sliceView()
                 renderer = view.renderWindow().GetRenderers().GetFirstRenderer()
-                # Supprimer les anciennes légendes spécifiques à ce nœud
+                # Supprimer les anciennes légendes spécifiques
                 for actor in list(renderer.GetActors2D()):
                     if hasattr(actor, "_isLegendActor") and actor._isLegendActor:
                         renderer.RemoveActor(actor)
                 base_y = 0.85
                 spacing = 0.06
                 font_size = 16
-                for i in range(segmentIDs.GetNumberOfValues()):
-                    seg_id = segmentIDs.GetValue(i)
-                    segment = segmentation.GetSegment(seg_id)
-                    color = segment.GetColor()
-                    label_value = segment.GetLabelValue()
-                    name = label_names.get(label_value, f"Label {label_value}")
+                i = 0
+                for label in [1, 2, 3]:
+                    name = label_names[label]
+                    color = fixed_colors[label]
                     full_text = f"■ {name}"
                     text_actor = vtk.vtkTextActor()
                     text_actor.SetInput(full_text)
@@ -354,6 +386,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     text_actor.SetPosition(0.77, base_y - i * spacing)
                     text_actor._isLegendActor = True
                     renderer.AddActor2D(text_actor)
+                    i += 1
                 view.forceRender()
             except Exception as e:
                 print(f"[WARN] Could not update annotation for {viewName} view: {e}")
@@ -384,7 +417,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     def initializeParameterNode(self):
         pass
 
-    # Modification : lors du chargement du scan, nous ne supprimons pas les scans précédents.
+    # Lors du chargement du scan, nous ne supprimons pas les scans précédents.
     def load_nii_in_slicer(self, nii_file):
         if not os.path.exists(nii_file):
             raise FileNotFoundError(f"NIfTI file not found: {nii_file}")
@@ -541,4 +574,3 @@ class CLICLogic(ScriptedLoadableModuleLogic):
             if log_callback:
                 log_callback(f"Error during processing: {str(e)}")
             raise
-
