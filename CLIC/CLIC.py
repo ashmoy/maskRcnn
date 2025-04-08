@@ -359,11 +359,15 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         import vtk
 
         layoutManager = slicer.app.layoutManager()
-        label_colors = {
-            1: (0.4, 0.8, 0.4),     # Buccal
-            2: (1.0, 0.85, 0.3),    # Bicortical
-            3: (0.8, 0.5, 0.5),     # Palatal
-        }
+
+        if not self.currentSegNode:
+            print("[WARN] Aucun nœud de segmentation actif.")
+            return
+
+        segmentation = self.currentSegNode.GetSegmentation()
+        segmentIDs = vtk.vtkStringArray()
+        segmentation.GetSegmentIDs(segmentIDs)
+
         label_names = {
             1: "Buccal",
             2: "Bicortical",
@@ -384,11 +388,17 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 spacing = 0.06
                 font_size = 16
 
-                for i, label in enumerate(label_names):
-                    color = label_colors[label]
-                    name = label_names[label]
+                for i in range(segmentIDs.GetNumberOfValues()):
+                    seg_id = segmentIDs.GetValue(i)
+                    segment = segmentation.GetSegment(seg_id)
+                    name = segment.GetName()
+                    color = segment.GetColor()
 
-                    # Texte unique : carré coloré + nom
+                    # Traduire nom si besoin (si ça vient du label index)
+                    label_value = segment.GetLabelValue()
+                    name = label_names.get(label_value, f"Label {label_value}")
+
+
                     full_text = f"■ {name}"
                     text_actor = vtk.vtkTextActor()
                     text_actor.SetInput(full_text)
@@ -396,7 +406,7 @@ class CLICWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                     prop = text_actor.GetTextProperty()
                     prop.SetFontSize(font_size)
                     prop.SetFontFamilyToArial()
-                    prop.SetColor(*color)  # Le carré hérite de cette couleur
+                    prop.SetColor(*color)
                     prop.BoldOn()
                     prop.ShadowOff()
 
