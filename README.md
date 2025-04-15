@@ -41,7 +41,7 @@ The module checks and automatically installs these dependencies upon first usage
 ### Step 1: Load CBCT Data
 
 - Use the file dialog to select your CBCT image or directory containing multiple CBCT images.
-- Available sample data for testing: [MN138.nii](https://github.com/ashmoy/maskRcnn/releases/tag/test_files/assets/MN138.nii) , [MG_test_scan.nii.gz](https://github.com/Maxlo24/AMASSS_CBCT/releases/download/v1.0.1/MG_test_scan.nii.gz)
+- Available sample data for testing: [MN138.nii](https://github.com/ashmoy/maskRcnn/releases/download/test_files/MN138.nii) , [UM06.nii](https://github.com/ashmoy/maskRcnn/releases/download/test_files/UM06.nii)
 
 ![image](https://github.com/user-attachments/assets/3f0e5bf4-4d0e-400f-b779-f16aa7d7f9d3)
 
